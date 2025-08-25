@@ -1,29 +1,10 @@
 import { useSearchParams, Link } from 'react-router-dom'
 import { generateFortune } from '../lib/fortuneEngine.js'
-
-// local seeded RNG so 확장 섹션도 재현 가능
-function xmur3(str) {
-  let h = 1779033703 ^ str.length
-  for (let i = 0; i < str.length; i++) {
-    h = Math.imul(h ^ str.charCodeAt(i), 3432918353)
-    h = (h << 13) | (h >>> 19)
-  }
-  return () => {
-    h = Math.imul(h ^ (h >>> 16), 2246822507)
-    h = Math.imul(h ^ (h >>> 13), 3266489909)
-    return (h ^= h >>> 16) >>> 0
-  }
-}
-function mulberry32(a) {
-  return () => {
-    let t = (a += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-function makeRng(seed) { const s = xmur3(seed)(); return mulberry32(s) }
-function randint(rng, min, max){ return Math.floor(rng()*(max-min+1))+min }
+import { fourPillars } from '../engine/bazi.js'
+import { countElements, inferStrength, decadeLuck } from '../engine/analysis.js'
+import { labelFromScore, tip, tomorrowPrep } from '../engine/nlg.js'
+import { pushHistory } from '../utils/history.js'
+import { useEffect } from 'react'
 
 function parseSeedBirth(seed='') {
   const [date, cal, time] = (seed || '').split('|')
@@ -45,8 +26,19 @@ const TIME_LABELS = {
   hae:   '해/亥 (21:30~23:29)',
   ja_pm: '야자/夜子 (23:30~23:59)',
 }
+const BRANCH_INDEX = { '자':0,'축':1,'인':2,'묘':3,'진':4,'사':5,'오':6,'미':7,'신':8,'유':9,'술':10,'해':11 }
+function timeToBlock(timeValue){
+  const idx = {unknown:0, ja_am:0, chuk:1, in:2, myo:3, jin:4, sa:5, o:6, mi:7, sin:8, yu:9, sul:10, hae:11, ja_pm:0}[timeValue||'unknown']
+  return idx
+}
+function nowDaypart(){
+  const h = new Date().getHours()
+  if (h < 12) return 'morning'
+  if (h < 18) return 'afternoon'
+  return 'evening'
+}
 
-export default function Result() {
+export default function Result(){
   const [sp] = useSearchParams()
   const name  = sp.get('name') || ''
   const birthSeed = sp.get('birth') || ''
@@ -62,58 +54,45 @@ export default function Result() {
   }
 
   const f = generateFortune(name, birthSeed)
-  const rng = makeRng(name + '|' + birthSeed)
+  const pillars = fourPillars(birthDate, timeToBlock(time))
+  const tally = countElements(pillars)
+  const strength = inferStrength(tally)
+  const dec = decadeLuck(2,7)
 
-  // 간단한 예시용: 사주 격자/오행/대운/위기 생성(실제 명리 계산 아님, 시드 기반 시각요소)
-  const stems = ['갑','을','병','정','무','기','경','신','임','계']
-  const branches = ['자','축','인','묘','진','사','오','미','신','유','술','해']
-  const tenGods = ['비견','겁재','식신','상관','편재','정재','편관','정관','편인','정인']
-  const fourPillars = {
-    year: { heaven: pick(stems, rng), earth: pick(branches, rng), ten: pick(tenGods, rng) },
-    month:{ heaven: pick(stems, rng), earth: pick(branches, rng), ten: pick(tenGods, rng) },
-    day:  { heaven: pick(stems, rng), earth: pick(branches, rng), ten: pick(tenGods, rng) },
-    time: { heaven: pick(stems, rng), earth: pick(branches, rng), ten: pick(tenGods, rng) },
-  }
-  const five = {
-    wood: randint(rng,0,5),
-    fire: randint(rng,0,5),
-    earth: randint(rng,0,5),
-    metal: randint(rng,0,5),
-    water: randint(rng,0,5),
-  }
-  const total = Math.max(1, five.wood + five.fire + five.earth + five.metal + five.water)
-  const fivePct = { wood: Math.round(five.wood/total*100), fire: Math.round(five.fire/total*100), earth: Math.round(five.earth/total*100), metal: Math.round(five.metal/total*100), water: Math.round(five.water/total*100) }
-  const strengthIdx = randint(rng, 0, 6) // 신약~극왕
-  const decadeStart = 2
-  const decades = Array.from({length:7}, (_,i)=> 2008 + i*10)
-  const ages = Array.from({length:7}, (_,i)=> 2 + i*10)
-  const risks = makeRisks(rng)
+  // history push once
+  useEffect(()=>{
+    const hash = btoa(unescape(encodeURIComponent(name+'|'+birthSeed))).slice(0,24)
+    pushHistory({ hash, name, birth: birthDate, cal, time, summary: f.summary, date: f.date })
+  }, [])
+
+  const items = [
+    { key:'연애운', value:f.scores.love },
+    { key:'금전운', value:f.scores.money },
+    { key:'건강운', value:f.scores.health },
+    { key:'학업운', value:f.scores.study },
+  ]
+  const ctx = { daypart: nowDaypart() }
 
   return (
-    <section className="hero noselect">
+    <section className="hero">
       <div className="card">
         <h2 style={{ marginTop: 0 }}>{name}님의 {f.date} 운세</h2>
         <p className="muted" style={{marginTop: -8}}>생년월일: {birthDate || '—'} · 달력: {cal==='lunar' ? '음력' : '양력'} · 태어난 시간: {TIME_LABELS[time]}</p>
 
-        <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4,
-                    background:'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
-                    WebkitBackgroundClip:'text', color:'transparent' }}>{f.summary}</p>
+        <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{f.summary}</p>
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-          <Metric label="연애운"  value={f.scores.love} />
-          <Metric label="금전운"  value={f.scores.money} />
-          <Metric label="건강운"  value={f.scores.health} />
-          <Metric label="학업운"  value={f.scores.study} />
+          {items.map(it=>(<Metric key={it.key} label={it.key} value={it.value} />))}
         </div>
 
         <div className="grid-2" style={{ marginTop: 18 }}>
-          <FourPillarsCard pillars={fourPillars} name={name} birthDate={birthDate} />
-          <DecadeLuck decades={decades} ages={ages} />
+          <FourPillarsCard pillars={pillars} name={name} birthDate={birthDate} />
+          <DecadeLuck years={dec.years} ages={dec.ages} />
         </div>
 
         <div className="grid-2" style={{ marginTop: 18 }}>
-          <FiveElements data={fivePct} />
-          <RisksCard risks={risks} />
+          <FiveElements data={tally} />
+          <UserFriendly name={name} items={items} ctx={ctx} />
         </div>
 
         <div style={{ marginTop: 16 }}>
@@ -129,61 +108,48 @@ export default function Result() {
   )
 }
 
-function pick(arr, rng){ return arr[Math.floor(rng()*arr.length)] }
-
-function Metric({ label, value }) {
+function Metric({ label, value }){
+  const tag = (value>=80?'높음': value>=60?'보통':'낮음')
   return (
     <div className="panel" style={{ padding: 12 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <span>{label}</span>
-        <strong>{value}</strong>
+        <span className="badge-soft">{tag}</span>
       </div>
-      <div className="meter" style={{ marginTop: 10 }}>
-        <i style={{ width: `${value}%` }} />
-      </div>
+      <div className="meter" style={{ marginTop: 10 }}><i style={{ width: `${value}%` }} /></div>
     </div>
   )
 }
 
-function FourPillarsCard({ pillars, name, birthDate }) {
+function FourPillarsCard({ pillars, name, birthDate }){
   const { year, month, day, time } = pillars
   return (
     <div className="panel">
       <h3 style={{marginTop:0}}>사주 격자(예시)</h3>
-      <p className="small">{name}님의 사주 · {birthDate || '—'}</p>
+      <p className="muted small">{name}님의 사주 · {birthDate || '—'}</p>
       <table className="table" style={{ marginTop: 8 }}>
-        <thead>
-          <tr>
-            <th>時</th><th>日</th><th>月</th><th>年</th>
-          </tr>
-        </thead>
+        <thead><tr><th>時</th><th>日</th><th>月</th><th>年</th></tr></thead>
         <tbody>
-          <tr>
-            <td>{time.ten}</td><td>{day.ten}</td><td>{month.ten}</td><td>{year.ten}</td>
-          </tr>
-          <tr>
-            <td>{time.heaven}</td><td>{day.heaven}</td><td>{month.heaven}</td><td>{year.heaven}</td>
-          </tr>
-          <tr>
-            <td>{time.earth}</td><td>{day.earth}</td><td>{month.earth}</td><td>{year.earth}</td>
-          </tr>
+          <tr><td>{time.ten||'—'}</td><td>{day.ten||'—'}</td><td>{month.ten||'—'}</td><td>{year.ten||'—'}</td></tr>
+          <tr><td>{time.heaven}</td><td>{day.heaven}</td><td>{month.heaven}</td><td>{year.heaven}</td></tr>
+          <tr><td>{time.earth}</td><td>{day.earth}</td><td>{month.earth}</td><td>{year.earth}</td></tr>
         </tbody>
       </table>
-      <p className="small">* 시드 기반 데모로 실제 명리 계산과 다를 수 있다.</p>
+      <p className="muted small">* 절기/정밀 간지는 향후 엔진 업그레이드로 보강 예정.</p>
     </div>
   )
 }
 
-function DecadeLuck({ decades, ages }) {
+function DecadeLuck({ years, ages }){
   return (
     <div className="panel">
       <h3 style={{marginTop:0}}>대운 표(예시)</h3>
       <div className="hr" />
       <div className="grid" style={{ gridTemplateColumns:'repeat(7, 1fr)' }}>
-        {decades.map((y, i) => (
+        {years.map((y,i)=>(
           <div key={y} className="card" style={{padding:10, textAlign:'center'}}>
             <div style={{fontWeight:800}}>{y}</div>
-            <div className="small">{ages[i]}세</div>
+            <div className="muted small">{ages[i]}세</div>
           </div>
         ))}
       </div>
@@ -191,128 +157,54 @@ function DecadeLuck({ decades, ages }) {
   )
 }
 
-function FiveElements({ data }) {
-  const labels = [
-    { key:'wood',  name:'목 木' },
-    { key:'fire',  name:'화 火' },
-    { key:'earth', name:'토 土' },
-    { key:'metal', name:'금 金' },
-    { key:'water', name:'수 水' },
+function FiveElements({ data }){
+  const list = [
+    { key:'wood',  name:'목 木', color:'var(--five-wood)' },
+    { key:'fire',  name:'화 火', color:'var(--five-fire)' },
+    { key:'earth', name:'토 土', color:'var(--five-earth)' },
+    { key:'metal', name:'금 金', color:'var(--five-metal)' },
+    { key:'water', name:'수 水', color:'var(--five-water)' },
   ]
-  const yongsin = labels.sort((a,b)=> data[b.key]-data[a.key])[0] // 가장 높은 비율 예시
+  const total = list.reduce((s,it)=> s + (data[it.key]||0), 0) || 1
   return (
     <div className="panel">
-      <h3 style={{marginTop:0}}>오행 & 용신(예시)</h3>
+      <h3 style={{marginTop:0}}>오행 분포(예시)</h3>
       <div className="grid">
-        {labels.map(({key, name}) => (
-          <div key={key}>
-            <div style={{display:'flex', justifyContent:'space-between', marginBottom:4}}>
-              <span>{name}</span><span>{data[key]}%</span>
+        {list.map(it=>{
+          const v = Math.round((data[it.key]||0)/total*100)
+          return (
+            <div key={it.key}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:4}}>
+                <span>{it.name}</span><span>{v}%</span>
+              </div>
+              <div className="bar"><i style={{width:`${v}%`, background: it.color}}/></div>
             </div>
-            <div className="bar"><i style={{width:`${data[key]}%`}}/></div>
-          </div>
-        ))}
-      </div>
-      <div className="hr" />
-      <div style={{display:'flex', gap:10, alignItems:'center'}}>
-        <span className="badge-soft">용신</span>
-        <strong>{yongsin.name.split(' ')[0]}</strong>
-        <span className="small">* 데모 계산</span>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function RisksCard({ risks }) {
+function UserFriendly({ name, items, ctx }){
   return (
     <div className="panel">
-      <h3 style={{marginTop:0}}>예상 리스크(예시)</h3>
-      <div className="grid">
-        {risks.map((r, i) => (
-          <div className="risk-item" key={i}>
-            <strong className="risk-index">{strIndex(i+1)}</strong>{r}
-          </div>
-        ))}
-      </div>
-      <p className="small">* 개인 상항 고려 필요. 중요한 결정은 다면적 판단 권장.</p>
-    </div>
-  )
-}
-
-function strIndex(n){ return ('0'+n).slice(-2) }
-function makeRisks(rng){
-  const pool = [
-    '잦은 이동/출장으로 생활 리듬 붕괴',
-    '무리한 투자로 인한 현금흐름 압박',
-    '평소 관리 소홀로 인한 건강 이슈',
-    '주변의 오해/커뮤니케이션 갈등',
-    '새 프로젝트 과도한 스코프 확장',
-    '과로로 인한 컨디션 저하',
-    '집안 수리/이사 등 주거 변수',
-  ]
-  const out = new Set()
-  while(out.size < 3){ out.add(pool[Math.floor(rng()*pool.length)]) }
-  return Array.from(out)
-}
-
-function tagOf(v){
-  if (v >= 80) return '높음'
-  if (v >= 60) return '보통'
-  return '낮음'
-}
-function tipFrom(label, v){
-  const low = {
-    '연애운': '연락을 기다리기보다 먼저 안부를 전해보세요.',
-    '금전운': '소액 지출 점검 + 불필요 구독 하나 끊기.',
-    '건강운': '수분 보충 + 20분 걷기만으로도 컨디션 회복.',
-    '학업운': '쉬운 문제부터 풀며 워밍업 → 집중 구간 만들기.',
-  }
-  const mid = {
-    '연애운': '약속 시간은 10분 여유, 작은 선물/메모가 효과적.',
-    '금전운': '현금흐름 체크 후 저축 자동이체 비율 1% 올리기.',
-    '건강운': '스트레칭 5분 + 카페인 오후 3시 이후 제한.',
-    '학업운': '50분 집중·10분 휴식의 타이머를 사용하세요.',
-  }
-  const high = {
-    '연애운': '대화하기 좋은 날. 솔직한 피드백이 관계에 도움.',
-    '금전운': '가격 비교 후 계획된 지출에 실행하기 좋음.',
-    '건강운': '컨디션 양호. 가벼운 유산소로 리듬 유지.',
-    '학업운': '어려운 과제를 먼저 공략해도 성과가 좋음.',
-  }
-  if (v >= 80) return high[label]
-  if (v >= 60) return mid[label]
-  return low[label]
-}
-
-function UserFriendly({ name, scores, advice }){
-  const items = [
-    { key:'연애운', value:scores.love },
-    { key:'금전운', value:scores.money },
-    { key:'건강운', value:scores.health },
-    { key:'학업운', value:scores.study },
-  ]
-  return (
-    <div className="panel" style={{ marginTop: 16 }}>
       <h3 style={{marginTop:0}}>오늘의 요약</h3>
-      <p><strong>{name}</strong>님을 위한 친화적 해석입니다. 각 항목의 점수를 <em>낮음/보통/높음</em>으로 바꿔 읽고, 바로 실행할 수 있는 한 줄 팁을 곁들였습니다.</p>
+      <p><strong>{name}</strong>님을 위한 친화적 해석입니다. 점수를 라벨로 읽고, 바로 실행 가능한 팁을 곁들였습니다.</p>
       <div className="grid">
         {items.map(it => (
           <div key={it.key} className="card" style={{padding:12}}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
               <span>{it.key}</span>
-              <span className="badge-soft">{tagOf(it.value)}</span>
+              <span className="badge-soft">{labelFromScore(it.value)}</span>
             </div>
-            <div className="small" style={{marginTop:6}}>{tipFrom(it.key, it.value)}</div>
+            <div className="muted small" style={{marginTop:6}}>{tip(it.key, it.value, ctx)}</div>
           </div>
         ))}
       </div>
       <div className="hr" />
-      <h4 style={{margin:'6px 0'}}>오늘의 할 일 3</h4>
-      <ul style={{marginTop:4}}>
-        <li>{advice[0]}</li>
-        <li>{advice[1]}</li>
-        <li>불필요 알림 1개 끄기 · 잡념 줄이기</li>
-      </ul>
+      <h4 style={{margin:'6px 0'}}>내일을 위한 준비 1</h4>
+      <p className="muted">{tomorrowPrep(ctx)}</p>
     </div>
   )
 }

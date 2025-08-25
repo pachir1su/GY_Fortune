@@ -1,14 +1,60 @@
 import { useNavigate } from 'react-router-dom'
 import { useFortuneStore } from '../store/useFortuneStore.js'
 
+const TIME_OPTIONS = [
+  { value: 'unknown', label: '시간 모름' },
+  { value: 'ja_am',  label: '조자/朝子 (00:00~01:29)' },
+  { value: 'chuk',   label: '축/丑 (01:30~03:29)' },
+  { value: 'in',     label: '인/寅 (03:30~05:29)' },
+  { value: 'myo',    label: '묘/卯 (05:30~07:29)' },
+  { value: 'jin',    label: '진/辰 (07:30~09:29)' },
+  { value: 'sa',     label: '사/巳 (09:30~11:29)' },
+  { value: 'o',      label: '오/午 (11:30~13:29)' },
+  { value: 'mi',     label: '미/未 (13:30~15:29)' },
+  { value: 'sin',    label: '신/申 (15:30~17:29)' },
+  { value: 'yu',     label: '유/酉 (17:30~19:29)' },
+  { value: 'sul',    label: '술/戌 (19:30~21:29)' },
+  { value: 'hae',    label: '해/亥 (21:30~23:29)' },
+  { value: 'ja_pm',  label: '야자/夜子 (23:30~23:59)' },
+]
+
+function digitsOnly(s='') { return (s || '').replace(/\D+/g, '') }
+function fmtYYYYMMDD(digits) {
+  const s = digitsOnly(digits).slice(0,8)
+  if (s.length <= 4) return s
+  if (s.length <= 6) return s.slice(0,4) + '.' + s.slice(4)
+  return s.slice(0,4) + '.' + s.slice(4,6) + '.' + s.slice(6,8)
+}
+function toHyphenDate(digits) {
+  const s = digitsOnly(digits)
+  if (s.length !== 8) return ''
+  return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8)
+}
+
 export default function Home() {
   const nav = useNavigate()
-  const { name, birth, setName, setBirth } = useFortuneStore()
+  const { name, birth, setName, setBirth, calendarType, setCalendarType, birthTime, setBirthTime } = useFortuneStore()
 
-  const canSubmit = name.trim() && /^\d{4}-\d{2}-\d{2}$/.test(birth)
+  const digits = digitsOnly(birth)
+  const hyphen = toHyphenDate(birth)
+  const isValid = digits.length === 8
+
+  const onBirthInput = (e) => {
+    // 키다운으로 1차 차단하지만, onChange에서 최종 필터링/포맷
+    const v = e.target.value
+    setBirth(fmtYYYYMMDD(v))
+  }
+  const onBirthKeyDown = (e) => {
+    const allowed = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End']
+    if (allowed.includes(e.key)) return
+    if (!/[0-9]/.test(e.key)) e.preventDefault()
+  }
 
   const submit = () => {
-    const params = new URLSearchParams({ name: name.trim(), birth })
+    if (!isValid) return
+    // seed 용으로 달력/시간 정보를 결합하여 전달
+    const seedBirth = `${hyphen}|${calendarType}|${birthTime}`
+    const params = new URLSearchParams({ name: name.trim(), birth: seedBirth })
     nav(`/result?${params.toString()}`)
   }
 
@@ -38,15 +84,37 @@ export default function Home() {
                 autoFocus
               />
             </label>
+
             <label>
               생년월일
               <input
                 value={birth}
-                onChange={(e) => setBirth(e.target.value)}
-                placeholder="YYYY-MM-DD"
+                onChange={onBirthInput}
+                onKeyDown={onBirthKeyDown}
+                placeholder="YYYY.MM.DD"
+                inputMode="numeric"
+                pattern="[0-9]*"
               />
             </label>
-            <button className={`btn btn-primary`} onClick={submit} disabled={!canSubmit}>오늘의 운세 보기</button>
+
+            <div className="row-2">
+              <label>
+                양력/음력
+                <div className="toggle">
+                  <span className={`opt ${calendarType==='solar' ? 'active':''}`} onClick={()=>setCalendarType('solar')}>양력</span>
+                  <span className={`opt ${calendarType==='lunar' ? 'active':''}`} onClick={()=>setCalendarType('lunar')}>음력</span>
+                </div>
+              </label>
+
+              <label>
+                태어난 시간
+                <select value={birthTime} onChange={(e)=>setBirthTime(e.target.value)}>
+                  {TIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <button className={`btn btn-primary`} onClick={submit} disabled={!isValid || !name.trim()}>오늘의 운세 보기</button>
           </div>
           <p className="muted" style={{marginTop:12, fontSize:12}}>개인정보는 저장되지 않으며, 브라우저 내에서만 처리됩니다.</p>
         </div>

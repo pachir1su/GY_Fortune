@@ -2,12 +2,36 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { generateFortune } from '../lib/fortuneEngine.js'
 import ShareCard from '../components/ShareCard.jsx'
 
+function parseSeedBirth(seed='') {
+  // seed 형식: YYYY-MM-DD|solar|ja_am
+  const [date, cal, time] = (seed || '').split('|')
+  return { date, cal: cal || 'solar', time: time || 'unknown' }
+}
+
+const TIME_LABELS = {
+  unknown: '시간 모름',
+  ja_am: '조자/朝子 (00:00~01:29)',
+  chuk:  '축/丑 (01:30~03:29)',
+  in:    '인/寅 (03:30~05:29)',
+  myo:   '묘/卯 (05:30~07:29)',
+  jin:   '진/辰 (07:30~09:29)',
+  sa:    '사/巳 (09:30~11:29)',
+  o:     '오/午 (11:30~13:29)',
+  mi:    '미/未 (13:30~15:29)',
+  sin:   '신/申 (15:30~17:29)',
+  yu:    '유/酉 (17:30~19:29)',
+  sul:   '술/戌 (19:30~21:29)',
+  hae:   '해/亥 (21:30~23:29)',
+  ja_pm: '야자/夜子 (23:30~23:59)',
+}
+
 export default function Result() {
   const [sp] = useSearchParams()
   const name  = sp.get('name') || ''
-  const birth = sp.get('birth') || ''
+  const birthSeed = sp.get('birth') || ''
+  const { date: birthDate, cal, time } = parseSeedBirth(birthSeed)
 
-  if (!name || !birth) {
+  if (!name || !birthSeed) {
     return (
       <div className="card">
         <p>입력 정보가 없습니다.</p>
@@ -16,12 +40,15 @@ export default function Result() {
     )
   }
 
-  const f = generateFortune(name, birth)
+  // 시드에 달력/시간을 포함했으므로 그대로 사용
+  const f = generateFortune(name, birthSeed)
 
   return (
     <section className="hero">
       <div className="card">
         <h2 style={{ marginTop: 0 }}>{name}님의 {f.date} 운세</h2>
+        <p className="muted" style={{marginTop: -8}}>생년월일: {birthDate || '—'} · 달력: {cal==='lunar' ? '음력' : '양력'} · 태어난 시간: {TIME_LABELS[time]}</p>
+
         <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4,
                     background:'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
                     WebkitBackgroundClip:'text', color:'transparent' }}>{f.summary}</p>

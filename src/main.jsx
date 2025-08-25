@@ -6,6 +6,46 @@ import Home from './pages/Home.jsx'
 import Result from './pages/Result.jsx'
 import './index.css'
 
+// 좌/우클릭/드래그 방지 토글
+(function(){
+  let enabled = JSON.parse(localStorage.getItem('protect') || 'true')
+  const onContext = (e)=> enabled && e.preventDefault()
+  const onSelect = (e)=> {
+    if (!enabled) return
+    const tag = (e.target.tagName||'').toLowerCase()
+    if (['input','textarea','select','button','a','label'].includes(tag)) return
+    e.preventDefault()
+  }
+  const onMouseDown = (e)=> {
+    if (!enabled) return
+    const tag = (e.target.tagName||'').toLowerCase()
+    if (['input','textarea','select','button','a','label'].includes(tag)) return
+    if (e.button===0) e.preventDefault()
+  }
+  const onDrag = (e)=> enabled && e.preventDefault()
+
+  window.__applyGuards = function(){
+    window.addEventListener('contextmenu', onContext)
+    window.addEventListener('selectstart', onSelect)
+    window.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('dragstart', onDrag)
+  }
+  window.__removeGuards = function(){
+    window.removeEventListener('contextmenu', onContext)
+    window.removeEventListener('selectstart', onSelect)
+    window.removeEventListener('mousedown', onMouseDown)
+    window.removeEventListener('dragstart', onDrag)
+  }
+  window.__toggleProtect = function(){
+    enabled = !enabled
+    localStorage.setItem('protect', JSON.stringify(enabled))
+    if (enabled) window.__applyGuards(); else window.__removeGuards();
+    alert('보호 모드: ' + (enabled ? '켜짐' : '꺼짐'))
+  }
+  if (enabled) window.__applyGuards()
+})()
+
+
 // 우클릭 방지
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 

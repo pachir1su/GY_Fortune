@@ -6,6 +6,9 @@ import Home from './pages/Home.jsx'
 import Result from './pages/Result.jsx'
 import './index.css'
 
+// 우클릭 방지
+window.addEventListener('contextmenu', (e) => e.preventDefault())
+
 const router = createBrowserRouter([
   {
     path: '/',

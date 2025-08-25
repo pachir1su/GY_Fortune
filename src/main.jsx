@@ -25,3 +25,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <RouterProvider router={router} />
   </React.StrictMode>
 )
+
+
+// 좌클릭 드래그/선택 방지(입력 컨트롤 제외)
+window.addEventListener('selectstart', (e) => {
+  const t = e.target
+  if (!t) return
+  const tag = (t.tagName || '').toLowerCase()
+  if (['input','textarea','select'].includes(tag)) return
+  e.preventDefault()
+})
+window.addEventListener('dragstart', (e) => e.preventDefault())
+window.addEventListener('mousedown', (e) => {
+  const t = e.target
+  const tag = (t && t.tagName || '').toLowerCase()
+  if (['input','textarea','select','button','a','label'].includes(tag)) return
+  if (e.button === 0) e.preventDefault()
+})

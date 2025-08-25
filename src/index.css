@@ -158,3 +158,72 @@ select:focus { border-color: var(--ring); box-shadow: 0 0 0 4px rgba(124,58,237,
 }
 .row-2 { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
 @media (max-width: 640px) { .row-2 { grid-template-columns: 1fr; } }
+
+
+/* --- Custom TimeSelect --- */
+.select-wrap { position: relative; }
+.select-btn {
+  width: 100%; padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: var(--text); text-align: left; display:flex; justify-content:space-between; align-items:center;
+}
+.caret { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid rgba(255,255,255,0.8); }
+.menu {
+  position:absolute; z-index: 80; top: calc(100% + 6px); left:0; right:0;
+  max-height: 320px; overflow: auto; border-radius: calc(var(--radius) + 2px);
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(15,15,30,0.98); backdrop-filter: blur(10px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+.menu-item {
+  padding: 12px 14px; cursor: pointer; font-weight: 600; color: #e7e9f1;
+}
+.menu-item:hover, .menu-item.active { background: rgba(124,58,237,0.22); }
+.menu-section { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+/* "시간 모름" switch pill */
+.switch {
+  display:inline-flex; align-items:center; gap:8px; cursor: pointer; user-select:none;
+  padding: 8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04); font-weight:700; font-size: 13px;
+}
+.switch input { display:none; }
+.switch.on { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); border-color: rgba(255,255,255,0.25); }
+
+/* Result rich sections */
+.panel {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+.grid-2 { display:grid; gap:14px; grid-template-columns: 1fr; }
+@media (min-width: 860px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+.hr { height:1px; background: rgba(255,255,255,0.1); margin: 10px 0 14px; }
+
+.table {
+  width:100%; border-collapse: collapse; overflow:hidden; border-radius: 12px;
+}
+.table th, .table td {
+  border: 1px solid rgba(255,255,255,0.12); padding: 8px 10px; text-align:center;
+}
+.badge-soft { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); }
+
+/* five bars */
+.bar {
+  height: 12px; border-radius: 999px; background: rgba(255,255,255,0.08);
+}
+.bar > i { display:block; height:100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-3), var(--accent-1)); }
+
+/* risk list */
+.risk-item { padding:10px 12px; border-radius:12px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); margin-bottom:8px; }
+.risk-index { font-weight:800; opacity:0.8; margin-right:8px; }
+.small { font-size:12px; color: var(--muted); }
+
+/* left-click/drag/select guard (safe except inputs) */
+.noselect *:not(input):not(textarea):not(select):not(button):not(a) {
+  user-select: none;
+}

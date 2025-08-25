@@ -145,34 +145,10 @@ export default function Home() {
               </label>
 
               <label>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>태어난 시간</span>
-                  <span
-                    className={`switch ${birthTime === "unknown" ? "on" : ""}`}
-                    onClick={() =>
-                      setBirthTime(
-                        birthTime === "unknown" ? "ja_am" : "unknown"
-                      )
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={birthTime === "unknown"}
-                    />
-                    시간 모름
-                  </span>
-                </div>
+                태어난 시간
                 <TimeSelect
                   value={birthTime}
                   onChange={(v) => setBirthTime(v)}
-                  disabled={birthTime === "unknown"}
                 />
               </label>
             </div>

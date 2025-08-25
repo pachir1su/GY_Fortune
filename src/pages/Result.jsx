@@ -1,6 +1,5 @@
 import { useSearchParams, Link } from 'react-router-dom'
 import { generateFortune } from '../lib/fortuneEngine.js'
-import ShareCard from '../components/ShareCard.jsx'
 
 // local seeded RNG so 확장 섹션도 재현 가능
 function xmur3(str) {
@@ -121,8 +120,6 @@ export default function Result() {
           <h3>럭키 키</h3>
           <p>색상: {f.lucky.color} / 아이템: {f.lucky.item} / 시간: {f.lucky.time}</p>
         </div>
-
-        <ShareCard title={`${name}님의 오늘 운세`} text={`${f.summary}\n연애:${f.scores.love} 금전:${f.scores.money} 건강:${f.scores.health} 학업:${f.scores.study}`} />
 
         <div style={{ marginTop: 16 }}>
           <Link to="/"><button className="btn">다시 하기</button></Link>
@@ -256,4 +253,66 @@ function makeRisks(rng){
   const out = new Set()
   while(out.size < 3){ out.add(pool[Math.floor(rng()*pool.length)]) }
   return Array.from(out)
+}
+
+function tagOf(v){
+  if (v >= 80) return '높음'
+  if (v >= 60) return '보통'
+  return '낮음'
+}
+function tipFrom(label, v){
+  const low = {
+    '연애운': '연락을 기다리기보다 먼저 안부를 전해보세요.',
+    '금전운': '소액 지출 점검 + 불필요 구독 하나 끊기.',
+    '건강운': '수분 보충 + 20분 걷기만으로도 컨디션 회복.',
+    '학업운': '쉬운 문제부터 풀며 워밍업 → 집중 구간 만들기.',
+  }
+  const mid = {
+    '연애운': '약속 시간은 10분 여유, 작은 선물/메모가 효과적.',
+    '금전운': '현금흐름 체크 후 저축 자동이체 비율 1% 올리기.',
+    '건강운': '스트레칭 5분 + 카페인 오후 3시 이후 제한.',
+    '학업운': '50분 집중·10분 휴식의 타이머를 사용하세요.',
+  }
+  const high = {
+    '연애운': '대화하기 좋은 날. 솔직한 피드백이 관계에 도움.',
+    '금전운': '가격 비교 후 계획된 지출에 실행하기 좋음.',
+    '건강운': '컨디션 양호. 가벼운 유산소로 리듬 유지.',
+    '학업운': '어려운 과제를 먼저 공략해도 성과가 좋음.',
+  }
+  if (v >= 80) return high[label]
+  if (v >= 60) return mid[label]
+  return low[label]
+}
+
+function UserFriendly({ name, scores, advice }){
+  const items = [
+    { key:'연애운', value:scores.love },
+    { key:'금전운', value:scores.money },
+    { key:'건강운', value:scores.health },
+    { key:'학업운', value:scores.study },
+  ]
+  return (
+    <div className="panel" style={{ marginTop: 16 }}>
+      <h3 style={{marginTop:0}}>오늘의 요약</h3>
+      <p><strong>{name}</strong>님을 위한 친화적 해석입니다. 각 항목의 점수를 <em>낮음/보통/높음</em>으로 바꿔 읽고, 바로 실행할 수 있는 한 줄 팁을 곁들였습니다.</p>
+      <div className="grid">
+        {items.map(it => (
+          <div key={it.key} className="card" style={{padding:12}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span>{it.key}</span>
+              <span className="badge-soft">{tagOf(it.value)}</span>
+            </div>
+            <div className="small" style={{marginTop:6}}>{tipFrom(it.key, it.value)}</div>
+          </div>
+        ))}
+      </div>
+      <div className="hr" />
+      <h4 style={{margin:'6px 0'}}>오늘의 할 일 3</h4>
+      <ul style={{marginTop:4}}>
+        <li>{advice[0]}</li>
+        <li>{advice[1]}</li>
+        <li>불필요 알림 1개 끄기 · 잡념 줄이기</li>
+      </ul>
+    </div>
+  )
 }

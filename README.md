@@ -1,4 +1,4 @@
-# GY_Fortune (React + Vite, JavaScript)
+# 건영운세
 
 ## 설치
 ```bash
